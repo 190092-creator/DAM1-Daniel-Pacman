@@ -9,6 +9,8 @@ import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.Button;
+import javafx.scene.control.ComboBox;
+import javafx.scene.control.ListCell;
 import javafx.scene.input.KeyCode;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
@@ -19,14 +21,17 @@ import javafx.scene.text.FontWeight;
 import javafx.scene.text.TextAlignment;
 import javafx.stage.Stage;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Queue;
 import java.util.Random;
 
 /**
  * PAC-MAN — JavaFX + JDK 21
- * Totalmente migrado a JavaFX (Canvas, GraphicsContext, AnimationTimer, Scene/Stage).
+ * Totalmente adaptado para JavaFX con selector de niveles, balance dinámico de velocidad,
+ * hitbox estricto en paredes y pathfinding BFS directo para el regreso de los fantasmas al respawn.
  *
  * Puntuación: punto normal +10 | bola de poder +50 | fantasma +250 | fruta extra +100
  */
@@ -48,13 +53,16 @@ public final class PacMan extends Application {
     private static final int FRUIT_LIFE = 8_000;        // vive 8 s (ms)
     private static final int GHOSTS_PER_LEVEL = 4;
 
-    /** Datos por nivel: {nombre, velocidadFantasma(px/s), segundosModoPoder}. */
+    /** Datos por nivel: {nombre, velocidadFantasmaBase(px/s), segundosModoPoder}. */
     private static final Object[][] LEVELS = {
             {"NIVEL 1 · Tranquilo",  62.0, 8.0},
             {"NIVEL 2 · Animado",    82.0, 7.0},
             {"NIVEL 3 · Rápido",    102.0, 6.0},
             {"NIVEL 4 · Frenético", 122.0, 5.0},
     };
+
+    /** Proporción de velocidad del fantasma asustado respecto a Pac-Man por nivel (siempre por debajo de pacman). */
+    private static final double[] FRIGHTENED_RATIOS = {0.76, 0.83, 0.89, 0.94};
 
     /** Modos scatter/chase globales (segundos). El último queda fijo en chase. */
     private static final double[] MODE_SEQ = {7, 20, 7, 20, 5, 20, 5};
@@ -158,7 +166,7 @@ public final class PacMan extends Application {
                     "#.#.#.#.#.#o..#.#.#.#.#.#.#",
                     "#.#.#.#.#.#.###.#.#.#.#.#.#",
                     "#.#.#.#.#.#.#...#.#.#.#.#.#",
-                    "#.#.#.#.#.#.#.###.#.#.#.#.#",
+                    "#.#.#.#.#.#.#.#---#.#.#.#.#",
                     "#.#.#.#.#.#.#.# GG#.#.#.#.#",
                     "#.#.#.#.#.#.#.#   #.#.#.#.#",
                     "#.#.#.#.#.#.#.#####.#.#.#.#",
@@ -188,7 +196,7 @@ public final class PacMan extends Application {
                     "#.#....#.#.#.#.#.#.#....#.#",
                     "#.#.####.#.#.#.#.#.####.#.#",
                     "#.#.#....#.......#....#.#.#",
-                    "#.#.#.####.#####.####.#.#.#",
+                    "#.#.#.####.......####.#.#.#",
                     "#.#.#.#  ##-----##  #.#.#.#",
                     "#.#...#  #       #  #...#.#",
                     "#.#.###  #   G   #  ###.#.#",
@@ -218,24 +226,32 @@ public final class PacMan extends Application {
     private char[][] grid;
     private int rows, cols, levelIdx, score, lives, dotsLeft;
     private boolean powerActive, fruitVisible, bonusChainActive;
+    private boolean isTestingSingleLevel = false;
     private double powerTime, modeClock, fruitClock, fruitLife, introClock, flashClock;
+    private double spawnGrace = 0.0;
     private int modeIndex, ghostsEatenChain, deathAnimT;
-    private Point fruitCell, pacSpawn;
+    private Point fruitCell, pacSpawn, ghostSpawnPoint;
 
     private final double[] px = new double[GHOSTS_PER_LEVEL];
     private final double[] py = new double[GHOSTS_PER_LEVEL];
     private final Dir[] gdir = new Dir[GHOSTS_PER_LEVEL];
-    private final int[] ghostMode = new int[GHOSTS_PER_LEVEL]; // 0 casa 1 saliendo 2 fuera 3 comido 4 entrando
+    private final int[] ghostMode = new int[GHOSTS_PER_LEVEL]; // 0 respawn/casa 1 saliendo 2 fuera 3 ojos volviendo
+    private final boolean[] ghostFrightened = new boolean[GHOSTS_PER_LEVEL];
+    private final boolean[] ghostImmuneToPower = new boolean[GHOSTS_PER_LEVEL];
     private final double[] ghostHouseTime = new double[GHOSTS_PER_LEVEL];
     private final int[] scatterTX = new int[GHOSTS_PER_LEVEL];
     private final int[] scatterTY = new int[GHOSTS_PER_LEVEL];
 
+    private int[][] distToGhostSpawn;
+
     private double pacX, pacY;
-    private int mouthT;
+    private double mouthTimer = 0.0;
     private Dir pacDir = Dir.NONE, pacQueued = Dir.NONE;
+    private Dir pacLastDir = Dir.RIGHT;
 
     private final List<double[]> popupFx = new ArrayList<>(); // {x, y, age, score}
-    private Button btnStart, btnPause, btnMenu;
+    private Button btnStart, btnPause, btnMenu, btnTestLevel;
+    private ComboBox<String> comboLevelTest;
 
     // ============================== ENTRY POINT ============================
     public static void main(String[] args) {
@@ -250,16 +266,49 @@ public final class PacMan extends Application {
         canvas = new Canvas(canvasW, canvasH);
         gc = canvas.getGraphicsContext2D();
 
-        btnStart = makeButton("▶  INICIAR", this::startGame);
-        btnPause = makeButton("⏸ PAUSA", this::togglePause);
+        // Botones y controles
+        btnStart = makeButton("▶  INICIAR", this::startGame, 115);
+        btnPause = makeButton("⏸ PAUSA", this::togglePause, 105);
         btnMenu  = makeButton("MENÚ", () -> {
             state = State.MENU;
             syncButtons();
+        }, 90);
+
+        comboLevelTest = new ComboBox<>();
+        comboLevelTest.getItems().addAll("Nivel 1", "Nivel 2", "Nivel 3", "Nivel 4");
+        comboLevelTest.setValue("Nivel 1");
+        comboLevelTest.setFocusTraversable(false);
+        comboLevelTest.setPrefSize(105, 34);
+        comboLevelTest.setStyle(
+                "-fx-background-color: #22223a; " +
+                "-fx-mark-color: #ffde32; " +
+                "-fx-font-family: 'Monospaced', monospace; " +
+                "-fx-font-weight: bold; " +
+                "-fx-font-size: 13px; " +
+                "-fx-background-radius: 16px; " +
+                "-fx-cursor: hand;"
+        );
+        comboLevelTest.setButtonCell(new ListCell<>() {
+            @Override
+            protected void updateItem(String item, boolean empty) {
+                super.updateItem(item, empty);
+                setText(empty || item == null ? "" : item);
+                setTextFill(Color.web("#ffde32"));
+                setFont(Font.font("Monospaced", FontWeight.BOLD, 13));
+                setStyle("-fx-background-color: transparent;");
+            }
         });
+
+        btnTestLevel = makeButton("🧪 PROBAR", () -> {
+            int selected = comboLevelTest.getSelectionModel().getSelectedIndex();
+            if (selected < 0) selected = 0;
+            startLevelTest(selected);
+        }, 115);
+
         btnPause.setDisable(true);
         btnMenu.setDisable(true);
 
-        HBox bar = new HBox(14, btnStart, btnPause, btnMenu);
+        HBox bar = new HBox(10, btnStart, comboLevelTest, btnTestLevel, btnPause, btnMenu);
         bar.setAlignment(Pos.CENTER);
         bar.setPadding(new Insets(10, 0, 10, 0));
         bar.setStyle("-fx-background-color: #0e0e22;");
@@ -271,6 +320,26 @@ public final class PacMan extends Application {
 
         Scene scene = new Scene(root);
         scene.setOnKeyPressed(e -> handleKey(e.getCode()));
+
+        // Clics interactivos en el menú para testear niveles
+        canvas.setOnMouseClicked(e -> {
+            if (state == State.MENU) {
+                double x = e.getX();
+                double y = e.getY() - HUD_H;
+                double w = canvas.getWidth();
+                double badgeY = 410;
+                double badgeH = 46;
+                if (y >= badgeY && y <= badgeY + badgeH) {
+                    for (int lvl = 0; lvl < 4; lvl++) {
+                        double bx = w / 2.0 - 245 + lvl * 125;
+                        if (x >= bx && x <= bx + 115) {
+                            startLevelTest(lvl);
+                            break;
+                        }
+                    }
+                }
+            }
+        });
 
         stage.setTitle("PAC-MAN · JavaFX");
         stage.setScene(scene);
@@ -299,15 +368,15 @@ public final class PacMan extends Application {
         timer.start();
     }
 
-    private Button makeButton(String text, Runnable action) {
+    private Button makeButton(String text, Runnable action, double prefWidth) {
         Button b = new Button(text);
         b.setFocusTraversable(false);
-        b.setPrefSize(150, 34);
+        b.setPrefSize(prefWidth, 34);
 
         String baseStyle = "-fx-text-fill: black; " +
                 "-fx-font-family: 'Monospaced', monospace; " +
                 "-fx-font-weight: bold; " +
-                "-fx-font-size: 14px; " +
+                "-fx-font-size: 13px; " +
                 "-fx-background-radius: 16px; ";
 
         String normalStyle = baseStyle + "-fx-background-color: #ffde32; -fx-cursor: hand;";
@@ -327,6 +396,16 @@ public final class PacMan extends Application {
 
     // ============================== TECLADO ================================
     private void handleKey(KeyCode code) {
+        if (state == State.MENU) {
+            switch (code) {
+                case DIGIT1, NUMPAD1 -> { startLevelTest(0); return; }
+                case DIGIT2, NUMPAD2 -> { startLevelTest(1); return; }
+                case DIGIT3, NUMPAD3 -> { startLevelTest(2); return; }
+                case DIGIT4, NUMPAD4 -> { startLevelTest(3); return; }
+                default -> {}
+            }
+        }
+
         Dir d = switch (code) {
             case UP, W    -> Dir.UP;
             case DOWN, S  -> Dir.DOWN;
@@ -362,10 +441,13 @@ public final class PacMan extends Application {
     }
 
     private void syncButtons() {
-        btnStart.setText(state == State.PLAYING || state == State.PAUSED ? "↻ REINICIAR" : "▶  INICIAR");
-        btnPause.setDisable(state != State.PLAYING && state != State.PAUSED);
+        boolean inGame = (state == State.PLAYING || state == State.PAUSED);
+        btnStart.setText(inGame ? "↻ REINICIAR" : "▶  INICIAR");
+        btnPause.setDisable(!inGame);
         btnPause.setText(state == State.PAUSED ? "▶ SEGUIR" : "⏸ PAUSA");
         btnMenu.setDisable(state == State.MENU);
+        comboLevelTest.setDisable(state != State.MENU);
+        btnTestLevel.setDisable(state != State.MENU);
     }
 
     // ============================== NIVELES ================================
@@ -373,7 +455,23 @@ public final class PacMan extends Application {
         score = 0;
         lives = START_LIVES;
         levelIdx = 0;
+        isTestingSingleLevel = false;
+        spawnGrace = 0;
         loadLevel(0);
+        state = State.LEVEL_INTRO;
+        introClock = 2.0;
+        syncButtons();
+        canvas.requestFocus();
+    }
+
+    private void startLevelTest(int idx) {
+        if (idx < 0 || idx >= MAZES.length) idx = 0;
+        score = 0;
+        lives = START_LIVES;
+        levelIdx = idx;
+        isTestingSingleLevel = true;
+        spawnGrace = 0;
+        loadLevel(idx);
         state = State.LEVEL_INTRO;
         introClock = 2.0;
         syncButtons();
@@ -385,7 +483,6 @@ public final class PacMan extends Application {
         rows = raw.length;
         cols = Arrays.stream(raw).mapToInt(String::length).max().orElse(0);
         grid = new char[rows][cols];
-        dotsLeft = 0;
         fruitCell = null;
 
         List<Point> gSpawn = new ArrayList<>();
@@ -403,13 +500,69 @@ public final class PacMan extends Application {
                         ch = ' ';
                     }
                     case 'T' -> { fruitCell = new Point(c, r); ch = ' '; }
-                    case '.', 'o' -> dotsLeft++;
                     default -> {}
                 }
                 grid[r][c] = ch;
             }
         }
         if (pacSpawn == null) pacSpawn = new Point(1, 1);
+
+        // Centro / Punto de respawn para los fantasmas
+        Point door = findDoorCenter();
+        if (!gSpawn.isEmpty()) {
+            int sumX = 0, sumY = 0;
+            for (Point p : gSpawn) { sumX += p.x; sumY += p.y; }
+            ghostSpawnPoint = new Point(sumX / gSpawn.size(), sumY / gSpawn.size());
+        } else if (door != null) {
+            ghostSpawnPoint = new Point(door.x, door.y + 2);
+        } else {
+            ghostSpawnPoint = new Point(cols / 2, rows / 2);
+        }
+
+        // Rellenar pasillos con bolas normales '.' excepto en el cuadrado central de spawn,
+        // pero asegurando que alrededor del spawn y por las paredes contiguas haya bolas
+        boolean[][] visited = new boolean[rows][cols];
+        Queue<Point> q = new ArrayDeque<>();
+        q.add(pacSpawn);
+        visited[pacSpawn.y][pacSpawn.x] = true;
+
+        while (!q.isEmpty()) {
+            Point p = q.poll();
+            for (Dir d : new Dir[]{Dir.UP, Dir.DOWN, Dir.LEFT, Dir.RIGHT}) {
+                int nr = p.y + drow(d);
+                int nc = p.x + dcol(d);
+                if (isTunnelRow(p.y)) {
+                    if (nc < 0) nc = cols - 1;
+                    else if (nc >= cols) nc = 0;
+                }
+                if (inside(nr, nc) && !visited[nr][nc]) {
+                    char cChar = grid[nr][nc];
+                    // Pac-Man no entra al spawn de fantasmas (puerta '-' y muros '#')
+                    if (cChar != '#' && cChar != '-') {
+                        visited[nr][nc] = true;
+                        q.add(new Point(nc, nr));
+                        // Si está vacío y no es spawn de Pac-Man ni fruta, rellenar con '.'
+                        if (cChar == ' ' && !(nc == pacSpawn.x && nr == pacSpawn.y)
+                                && (fruitCell == null || !(nc == fruitCell.x && nr == fruitCell.y))) {
+                            grid[nr][nc] = '.';
+                        }
+                    }
+                }
+            }
+        }
+
+        // Recuento total de bolas
+        dotsLeft = 0;
+        for (int r = 0; r < rows; r++) {
+            for (int c = 0; c < cols; c++) {
+                char ch = grid[r][c];
+                if (ch == '.' || ch == 'o') dotsLeft++;
+            }
+        }
+
+        // Precalcular distancias BFS para que los ojos vuelvan DIRECTOS al spawn
+        computeGhostSpawnBFS();
+
         if (fruitCell == null && maxGR >= 0) { // respaldo: buscar hueco bajo la casa
             outer:
             for (int r = maxGR + 1; r < rows; r++) {
@@ -422,18 +575,10 @@ public final class PacMan extends Application {
         // Esquinas scatter (con margen del borde)
         int[][] corners = {{1, 1}, {cols - 2, 1}, {1, rows - 2}, {cols - 2, rows - 2}};
         for (int i = 0; i < GHOSTS_PER_LEVEL; i++) {
-            Point sp = gSpawn.isEmpty() ? new Point(cols / 2, rows / 2) : gSpawn.get(i % gSpawn.size());
-            px[i] = sp.x * CELL + CELL / 2.0;
-            py[i] = sp.y * CELL + CELL / 2.0;
-            ghostMode[i] = 0;
-            ghostHouseTime[i] = 0;
-            gdir[i] = Dir.UP;
             scatterTX[i] = corners[i][0];
             scatterTY[i] = corners[i][1];
         }
 
-        powerActive = false;
-        powerTime = 0;
         modeClock = 0;
         modeIndex = 0;
         fruitClock = 0;
@@ -442,49 +587,69 @@ public final class PacMan extends Application {
         resetPositions();
     }
 
+    private void computeGhostSpawnBFS() {
+        distToGhostSpawn = new int[rows][cols];
+        for (int r = 0; r < rows; r++) {
+            Arrays.fill(distToGhostSpawn[r], Integer.MAX_VALUE);
+        }
+
+        Queue<Point> queue = new ArrayDeque<>();
+        distToGhostSpawn[ghostSpawnPoint.y][ghostSpawnPoint.x] = 0;
+        queue.add(ghostSpawnPoint);
+
+        while (!queue.isEmpty()) {
+            Point p = queue.poll();
+            int currDist = distToGhostSpawn[p.y][p.x];
+
+            for (Dir d : new Dir[]{Dir.UP, Dir.DOWN, Dir.LEFT, Dir.RIGHT}) {
+                int nr = p.y + drow(d);
+                int nc = p.x + dcol(d);
+
+                if (isTunnelRow(p.y)) {
+                    if (nc < 0) nc = cols - 1;
+                    else if (nc >= cols) nc = 0;
+                }
+
+                if (inside(nr, nc)) {
+                    // Los ojos pueden atravesar puertas ('-') pero nunca muros ('#')
+                    if (isWalk(nr, nc, true) && distToGhostSpawn[nr][nc] > currDist + 1) {
+                        distToGhostSpawn[nr][nc] = currDist + 1;
+                        queue.add(new Point(nc, nr));
+                    }
+                }
+            }
+        }
+    }
+
     private void resetPositions() {
         pacX = pacSpawn.x * CELL + CELL / 2.0;
         pacY = pacSpawn.y * CELL + CELL / 2.0;
         pacDir = Dir.NONE;
         pacQueued = Dir.NONE;
+        pacLastDir = Dir.RIGHT;
+        deathAnimT = 0;
+        spawnGrace = 0.0;
+        mouthTimer = 0.0; // Inicia la animación de comer inmediatamente
+
+        // Todos los fantasmas salen exactamente en el centro / punto de respawn al empezar nivel
         for (int i = 0; i < GHOSTS_PER_LEVEL; i++) {
-            Point sp = findHouseInterior(i);
-            px[i] = sp.x * CELL + CELL / 2.0;
-            py[i] = sp.y * CELL + CELL / 2.0;
-            ghostMode[i] = 0;
+            px[i] = ghostSpawnPoint.x * CELL + CELL / 2.0;
+            py[i] = ghostSpawnPoint.y * CELL + CELL / 2.0;
+            ghostMode[i] = 0; // En respawn
             ghostHouseTime[i] = 0;
+            ghostFrightened[i] = false;
+            ghostImmuneToPower[i] = false;
             gdir[i] = Dir.UP;
         }
         powerActive = false;
         powerTime = 0;
     }
 
-    private Point findHouseInterior(int i) {
-        int bestD = Integer.MAX_VALUE;
-        Point best = new Point(1, 1);
-        int cx = cols / 2, cy = rows / 2;
-        for (int r = 1; r < rows - 1; r++) {
-            for (int c = 1; c < cols - 1; c++) {
-                if (grid[r][c] == ' ' && isSurroundedish(r, c)) {
-                    int d = Math.abs(r - cy) + Math.abs(c - cx) + ((i + c) % 2);
-                    if (d < bestD) { bestD = d; best = new Point(c, r); }
-                }
-            }
-        }
-        return best;
-    }
-
-    private boolean isSurroundedish(int r, int c) {
-        int walls = 0;
-        for (Dir d : new Dir[]{Dir.UP, Dir.DOWN, Dir.LEFT, Dir.RIGHT}) {
-            int nr = r + drow(d), nc = c + dcol(d);
-            if (!inside(nr, nc) || grid[nr][nc] == '#' || grid[nr][nc] == '-') walls++;
-        }
-        return walls >= 3;
-    }
-
     // ============================== BUCLE ==================================
     private void tick(double dt) {
+        mouthTimer += dt; // Animación de la boca comiendo activa continuamente
+        if (spawnGrace > 0) spawnGrace -= dt;
+
         if (state == State.PLAYING) {
             update(dt);
         } else if (state == State.LEVEL_INTRO) {
@@ -502,7 +667,13 @@ public final class PacMan extends Application {
         // Modo poder
         if (powerActive) {
             powerTime -= dt;
-            if (powerTime <= 0) powerActive = false;
+            if (powerTime <= 0) {
+                powerActive = false;
+                for (int i = 0; i < GHOSTS_PER_LEVEL; i++) {
+                    ghostFrightened[i] = false;
+                    ghostImmuneToPower[i] = false;
+                }
+            }
         }
         // Secuencia scatter/chase
         if (modeIndex < MODE_SEQ.length) {
@@ -533,59 +704,111 @@ public final class PacMan extends Application {
 
     // ============================== PAC-MAN ================================
     private void movePac(double dt) {
-        int speed = PAC_BASE + levelIdx * 8;
-        if (pacDir != Dir.NONE && pacQueued != pacDir) {
-            if (canMove(pacX, pacY, pacQueued, false)) pacDir = pacQueued;
+        double speed = PAC_BASE + levelIdx * 8;
+
+        // 1. Intentar girar o cambiar de sentido hacia pacQueued
+        if (pacQueued != Dir.NONE && pacQueued != pacDir) {
+            if (pacQueued == opposite(pacDir)) {
+                // Giro de 180°: inmediato sin necesidad de llegar a la intersección
+                pacDir = pacQueued;
+                pacLastDir = pacDir;
+            } else {
+                // Giro perpendicular: solo si la celda objetivo es transitable y está alineado al pasillo
+                int curC = (int) Math.round((pacX - CELL / 2.0) / CELL);
+                int curR = (int) Math.round((pacY - CELL / 2.0) / CELL);
+                double targetX = curC * CELL + CELL / 2.0;
+                double targetY = curR * CELL + CELL / 2.0;
+
+                int nextR = curR + drow(pacQueued);
+                int nextC = curC + dcol(pacQueued);
+
+                boolean pathOpen = isWalk(nextR, nextC, false);
+                boolean aligned = (dcol(pacQueued) != 0)
+                        ? Math.abs(pacY - targetY) < 6.0
+                        : Math.abs(pacX - targetX) < 6.0;
+
+                if (pathOpen && aligned) {
+                    pacDir = pacQueued;
+                    pacLastDir = pacDir;
+                    // Centrar firmemente en el eje perpendicular para no chocar ni salirse
+                    if (dcol(pacDir) != 0) pacY = targetY;
+                    else pacX = targetX;
+                }
+            }
         }
-        if (pacDir == Dir.NONE && pacQueued != Dir.NONE && canMove(pacX, pacY, pacQueued, false)) {
-            pacDir = pacQueued;
-        }
+
+        if (pacDir == Dir.NONE) return;
 
         double remaining = speed * dt;
         while (remaining > 0.0001 && pacDir != Dir.NONE) {
-            double distToCenter = distToAxisCenter(pacX, pacY, pacDir);
-            double step = Math.min(remaining, Math.max(distToCenter, 0.0001));
-            if (distToCenter < 0.5) {
-                if (pacQueued != pacDir && canMove(pacX, pacY, pacQueued, false)) pacDir = pacQueued;
-                if (!canMove(pacX, pacY, pacDir, false)) { pacDir = Dir.NONE; break; }
-                step = Math.min(remaining, CELL / 2.0);
-            }
-            pacX += dcol(pacDir) * step;
-            pacY += drow(pacDir) * step;
-            remaining -= step;
+            int curC = (int) Math.round((pacX - CELL / 2.0) / CELL);
+            int curR = (int) Math.round((pacY - CELL / 2.0) / CELL);
+            double targetX = curC * CELL + CELL / 2.0;
+            double targetY = curR * CELL + CELL / 2.0;
 
-            // efecto túnel
-            if (pacX < -CELL / 2.0) pacX = cols * CELL + CELL / 2.0 - 1;
-            if (pacX > cols * CELL + CELL / 2.0) pacX = -CELL / 2.0 + 1;
-            mouthT++;
+            int nextR = curR + drow(pacDir);
+            int nextC = curC + dcol(pacDir);
+            boolean wallAhead = !isWalk(nextR, nextC, false);
+
+            if (wallAhead) {
+                // Hay muro adelante: no se puede pasar del centro de la celda actual (hitbox estricto)
+                double distToStop = (dcol(pacDir) != 0)
+                        ? (targetX - pacX) * dcol(pacDir)
+                        : (targetY - pacY) * drow(pacDir);
+
+                if (distToStop <= 0.001) {
+                    pacX = targetX;
+                    pacY = targetY;
+                    pacDir = Dir.NONE;
+                    break;
+                }
+                double step = Math.min(remaining, distToStop);
+                pacX += dcol(pacDir) * step;
+                pacY += drow(pacDir) * step;
+                remaining -= step;
+                if (step >= distToStop) {
+                    pacX = targetX;
+                    pacY = targetY;
+                    pacDir = Dir.NONE;
+                    break;
+                }
+            } else {
+                // Camino libre: avanzar hacia el centro de la siguiente celda
+                double distToNext = (dcol(pacDir) != 0)
+                        ? ((targetX + dcol(pacDir) * CELL) - pacX) * dcol(pacDir)
+                        : ((targetY + drow(pacDir) * CELL) - pacY) * drow(pacDir);
+
+                double step = Math.min(remaining, Math.max(0.1, distToNext));
+                pacX += dcol(pacDir) * step;
+                pacY += drow(pacDir) * step;
+                remaining -= step;
+            }
+
+            // Efecto túnel seguro
+            int currentRow = (int) Math.floor(pacY / CELL);
+            if (isTunnelRow(currentRow)) {
+                if (pacX < -CELL / 2.0) pacX = cols * CELL + CELL / 2.0 - 1;
+                else if (pacX > cols * CELL + CELL / 2.0) pacX = -CELL / 2.0 + 1;
+            } else {
+                // Pared exterior impenetrable: Pac-Man nunca se puede salir del mapa
+                pacX = Math.max(CELL / 2.0, Math.min(cols * CELL - CELL / 2.0, pacX));
+                pacY = Math.max(CELL / 2.0, Math.min(rows * CELL - CELL / 2.0, py[0] != 0 ? pacY : pacY));
+            }
         }
     }
 
-    private double distToAxisCenter(double x, double y, Dir d) {
-        double cx = Math.floor(x / CELL) * CELL + CELL / 2.0;
-        double cy = Math.floor(y / CELL) * CELL + CELL / 2.0;
-        return switch (d) {
-            case RIGHT -> ((cx + CELL) - x);
-            case LEFT  -> (x - (cx - CELL));
-            case DOWN  -> ((cy + CELL) - y);
-            case UP    -> (y - (cy - CELL));
-            default    -> 0.0;
-        };
-    }
-
-    private boolean canMove(double x, double y, Dir d, boolean ghostThroughDoor) {
-        double nx = x + dcol(d) * (CELL / 2.0 + 0.5);
-        double ny = y + drow(d) * (CELL / 2.0 + 0.5);
-        int c = (int) Math.floor(nx / CELL);
-        int r = (int) Math.floor(ny / CELL);
-        if (!inside(r, c)) return true; // túnel
-        return isWalk(r, c, ghostThroughDoor);
-    }
-
     private boolean isWalk(int r, int c, boolean ghostThroughDoor) {
+        if (r < 0 || r >= rows) return false;
+        if (c < 0 || c >= cols) {
+            return isTunnelRow(r);
+        }
         char ch = grid[r][c];
-        if (ch == '#') return false;
+        if (ch == '#') return false; // Muro: NUNCA atravesable por nada ni nadie
         return ch != '-' || ghostThroughDoor;
+    }
+
+    private boolean isTunnelRow(int r) {
+        return r >= 0 && r < rows && grid[r][0] != '#' && grid[r][cols - 1] != '#';
     }
 
     // ============================== FANTASMAS ==============================
@@ -600,68 +823,236 @@ public final class PacMan extends Application {
     }
 
     private void moveGhost(int i, double dt) {
-        double base = (double) LEVELS[levelIdx][1];
-        double speed = switch (ghostMode[i]) {
-            case 3 -> base * 2.1;               // ojos: muy rápidos
-            case 2 -> powerActive ? base * 0.55 : base;
-            default -> base * 0.8;
-        };
+        double pacSpeed = PAC_BASE + levelIdx * 8;
+
+        // Velocidad:
+        // - Si Pac-Man está en modo normal: fantasmas 1 px/s más rápidos que Pac-Man
+        // - Si Pac-Man está bajo la bola de poder: fantasmas más lentos según la tabla de proporciones programada
+        // - Si ha respawneado ignorando el modo poder: velocidad normal (1 px/s más rápido que Pac-Man)
+        double speed;
+        if (ghostMode[i] == 3) {
+            speed = Math.max(pacSpeed * 1.8, 220.0); // Ojos: vuelven directo y rápido al respawn
+        } else if (ghostMode[i] == 2) {
+            if (ghostFrightened[i] && !ghostImmuneToPower[i]) {
+                double ratio = (levelIdx >= 0 && levelIdx < FRIGHTENED_RATIOS.length)
+                        ? FRIGHTENED_RATIOS[levelIdx]
+                        : 0.94;
+                speed = pacSpeed * ratio; // Bajo efectos de bola de poder: más lentos que Pac-Man
+            } else {
+                speed = pacSpeed + 1.0; // En modo normal o inmune tras respawn: 1px/s más rápido que Pac-Man
+            }
+        } else {
+            speed = (pacSpeed + 1.0) * 0.8;
+        }
+
         if (inTunnelRow(i)) speed *= 0.6;
 
-        if (ghostMode[i] == 0) { // rebota en la casa y espera turno
+        // Modo 0: en el centro/respawn esperando su turno de salida escalonada
+        if (ghostMode[i] == 0) {
             ghostHouseTime[i] += dt;
-            py[i] += (gdir[i] == Dir.UP ? -1 : 1) * base * 0.5 * dt;
-            int cy = (int) ((py[i] - CELL / 2.0) / CELL);
-            if (gdir[i] == Dir.UP && py[i] <= cy * CELL + CELL / 2.0 + 2) gdir[i] = Dir.DOWN;
-            if (gdir[i] == Dir.DOWN && py[i] >= cy * CELL + CELL / 2.0 - 2) gdir[i] = Dir.UP;
-            if (powerTime <= 0 && ghostHouseTime[i] > i * 2.2) ghostMode[i] = 1;
+            py[i] += (gdir[i] == Dir.UP ? -1 : 1) * (pacSpeed * 0.5) * dt;
+            double cy = ghostSpawnPoint.y * CELL + CELL / 2.0;
+            if (gdir[i] == Dir.UP && py[i] <= cy - 3) gdir[i] = Dir.DOWN;
+            if (gdir[i] == Dir.DOWN && py[i] >= cy + 3) gdir[i] = Dir.UP;
+
+            if (ghostHouseTime[i] > i * 1.8) {
+                ghostMode[i] = 1; // Salir de la casa hacia el laberinto
+                gdir[i] = Dir.UP;
+            }
             return;
         }
 
-        boolean throughDoor = ghostMode[i] == 1 || ghostMode[i] == 4;
-        double remaining = speed * dt;
-        int guard = 0;
-        while (remaining > 0.0001 && guard++ < 8) {
-            int c = (int) (px[i] / CELL), r = (int) (py[i] / CELL);
-            double cx = c * CELL + CELL / 2.0, cyy = r * CELL + CELL / 2.0;
-            double dx = Math.abs(px[i] - cx), dy = Math.abs(py[i] - cyy);
-            if (dx < 0.75 && dy < 0.75) {
-                px[i] = cx; py[i] = cyy;
-                chooseGhostDir(i, r, c, throughDoor);
+        // Modo 1: salir de la casa a través de la puerta hacia el laberinto
+        if (ghostMode[i] == 1) {
+            Point door = findDoorCenter();
+            if (door != null) {
+                double doorX = door.x * CELL + CELL / 2.0;
+                double doorY = door.y * CELL + CELL / 2.0;
+                double exitY = (door.y - 1) * CELL + CELL / 2.0;
+
+                // Primero alinearse horizontalmente con el centro de la puerta
+                if (Math.abs(px[i] - doorX) > 0.8) {
+                    double step = Math.min(speed * dt, Math.abs(px[i] - doorX));
+                    px[i] += (px[i] < doorX ? 1 : -1) * step;
+                    gdir[i] = (px[i] < doorX) ? Dir.RIGHT : Dir.LEFT;
+                    return;
+                } else {
+                    px[i] = doorX;
+                    gdir[i] = Dir.UP;
+                    py[i] -= speed * dt;
+                    if (py[i] <= exitY) {
+                        py[i] = exitY;
+                        ghostMode[i] = 2; // Ya cruzó la puerta, entra en juego para atacar
+                        chooseGhostDir(i, door.y - 1, door.x, false);
+                    }
+                    return;
+                }
+            } else {
+                ghostMode[i] = 2;
             }
-            double step = Math.min(remaining, CELL / 2.0);
-            px[i] += dcol(gdir[i]) * step;
-            py[i] += drow(gdir[i]) * step;
-            remaining -= step;
-            if (px[i] < -CELL / 2.0) px[i] = cols * CELL + CELL / 2.0 - 1;
-            if (px[i] > cols * CELL + CELL / 2.0) px[i] = -CELL / 2.0 + 1;
         }
 
-        // llegada a la puerta / interior
-        if (ghostMode[i] == 1) {
-            Point door = findDoor();
-            if (door != null && py[i] < door.y * CELL) ghostMode[i] = 2;
+        // Modo 3: Ojos regresando al respawn
+        if (ghostMode[i] == 3) {
+            double distToRespawn = Math.hypot(px[i] - (ghostSpawnPoint.x * CELL + CELL / 2.0),
+                    py[i] - (ghostSpawnPoint.y * CELL + CELL / 2.0));
+            if (distToRespawn < CELL * 0.75) {
+                // Llegaron al centro/punto de respawn:
+                // Vuelven a salir como fantasmas normales y podrán volver a atacar a Pac-Man
+                px[i] = ghostSpawnPoint.x * CELL + CELL / 2.0;
+                py[i] = ghostSpawnPoint.y * CELL + CELL / 2.0;
+                ghostMode[i] = 1;           // Sale inmediatamente hacia la puerta
+                ghostFrightened[i] = false;  // Normal, no vulnerable
+                gdir[i] = Dir.UP;           // Sube hacia la salida
+
+                // Al salir de nuevo tras haber respawneado, ignora que Pac-Man esté en modo poder
+                // únicamente hasta que salga de ese modo poder
+                if (powerActive) {
+                    ghostImmuneToPower[i] = true;
+                }
+                return;
+            }
         }
-        if (ghostMode[i] == 4) {
-            Point door = findDoor();
-            if (door != null && Math.hypot(px[i] - (door.x * CELL + CELL / 2.0), py[i] - (door.y * CELL + CELL)) < CELL * 0.6) {
-                ghostMode[i] = 0;
-                ghostHouseTime[i] = 0;
-                gdir[i] = Dir.UP;
+
+        // Modos 2 y 3: Hitbox estricto contra todas las paredes ('#'), solo permitiendo puerta ('-') si es modo 3
+        boolean throughDoor = (ghostMode[i] == 3);
+        double remaining = speed * dt;
+        int maxSteps = 10;
+
+        while (remaining > 0.0001 && maxSteps-- > 0 && gdir[i] != Dir.NONE) {
+            int curC = (int) Math.round((px[i] - CELL / 2.0) / CELL);
+            int curR = (int) Math.round((py[i] - CELL / 2.0) / CELL);
+            if (isTunnelRow(curR)) {
+                if (curC < 0) curC = cols - 1;
+                else if (curC >= cols) curC = 0;
+            } else {
+                curC = Math.max(0, Math.min(cols - 1, curC));
+                curR = Math.max(0, Math.min(rows - 1, curR));
+            }
+
+            double targetX = curC * CELL + CELL / 2.0;
+            double targetY = curR * CELL + CELL / 2.0;
+
+            // Centrado perpendicular estricto en el pasillo: nunca roza ni entra en paredes laterales
+            if (dcol(gdir[i]) != 0) {
+                py[i] = targetY;
+            } else if (drow(gdir[i]) != 0) {
+                px[i] = targetX;
+            }
+
+            int nextR = curR + drow(gdir[i]);
+            int nextC = curC + dcol(gdir[i]);
+            if (isTunnelRow(curR)) {
+                if (nextC < 0) nextC = cols - 1;
+                else if (nextC >= cols) nextC = 0;
+            }
+
+            boolean wallAhead = !isWalk(nextR, nextC, throughDoor);
+
+            if (wallAhead) {
+                // Hay muro adelante: el fantasma no puede pasar del centro de la celda actual (hitbox estricto)
+                double distToStop = (dcol(gdir[i]) != 0)
+                        ? (targetX - px[i]) * dcol(gdir[i])
+                        : (targetY - py[i]) * drow(gdir[i]);
+
+                if (distToStop <= 0.001) {
+                    px[i] = targetX;
+                    py[i] = targetY;
+                    chooseGhostDir(i, curR, curC, throughDoor);
+                    int testR = curR + drow(gdir[i]);
+                    int testC = curC + dcol(gdir[i]);
+                    if (isTunnelRow(curR)) {
+                        if (testC < 0) testC = cols - 1;
+                        else if (testC >= cols) testC = 0;
+                    }
+                    if (!isWalk(testR, testC, throughDoor)) {
+                        break; // Bloqueado, esperar en el centro exacto sin atravesar la pared
+                    }
+                    continue;
+                }
+
+                double step = Math.min(remaining, distToStop);
+                px[i] += dcol(gdir[i]) * step;
+                py[i] += drow(gdir[i]) * step;
+                remaining -= step;
+
+                if (step >= distToStop) {
+                    px[i] = targetX;
+                    py[i] = targetY;
+                    chooseGhostDir(i, curR, curC, throughDoor);
+                }
+            } else {
+                // Camino libre hacia el centro de la siguiente celda
+                double nextCenterX = targetX + dcol(gdir[i]) * CELL;
+                double nextCenterY = targetY + drow(gdir[i]) * CELL;
+
+                double distToNext = (dcol(gdir[i]) != 0)
+                        ? (nextCenterX - px[i]) * dcol(gdir[i])
+                        : (nextCenterY - py[i]) * drow(gdir[i]);
+
+                if (distToNext <= 0.001) {
+                    int reachedC = curC + dcol(gdir[i]);
+                    int reachedR = curR + drow(gdir[i]);
+                    if (isTunnelRow(reachedR)) {
+                        if (reachedC < 0) reachedC = cols - 1;
+                        else if (reachedC >= cols) reachedC = 0;
+                    }
+                    px[i] = reachedC * CELL + CELL / 2.0;
+                    py[i] = reachedR * CELL + CELL / 2.0;
+                    chooseGhostDir(i, reachedR, reachedC, throughDoor);
+                    continue;
+                }
+
+                double step = Math.min(remaining, distToNext);
+                px[i] += dcol(gdir[i]) * step;
+                py[i] += drow(gdir[i]) * step;
+                remaining -= step;
+
+                if (step >= distToNext) {
+                    int reachedC = curC + dcol(gdir[i]);
+                    int reachedR = curR + drow(gdir[i]);
+                    if (isTunnelRow(reachedR)) {
+                        if (reachedC < 0) reachedC = cols - 1;
+                        else if (reachedC >= cols) reachedC = 0;
+                    }
+                    px[i] = reachedC * CELL + CELL / 2.0;
+                    py[i] = reachedR * CELL + CELL / 2.0;
+                    chooseGhostDir(i, reachedR, reachedC, throughDoor);
+                }
+            }
+
+            // Efecto túnel seguro y límites exteriores impenetrables
+            int currentRow = (int) Math.floor(py[i] / CELL);
+            if (isTunnelRow(currentRow)) {
+                if (px[i] < -CELL / 2.0) px[i] = cols * CELL + CELL / 2.0 - 1;
+                else if (px[i] > cols * CELL + CELL / 2.0) px[i] = -CELL / 2.0 + 1;
+            } else {
+                px[i] = Math.max(CELL / 2.0, Math.min(cols * CELL - CELL / 2.0, px[i]));
+                py[i] = Math.max(CELL / 2.0, Math.min(rows * CELL - CELL / 2.0, py[i]));
             }
         }
     }
 
     private boolean inTunnelRow(int i) {
         int r = (int) (py[i] / CELL);
-        return r >= 0 && r < rows && grid[r][0] != '#' && grid[r][cols - 1] != '#';
+        return isTunnelRow(r);
     }
 
-    private Point findDoor() {
+    private Point findDoorCenter() {
+        int count = 0;
+        int sumC = 0;
+        int doorR = -1;
         for (int r = 0; r < rows; r++) {
             for (int c = 0; c < cols; c++) {
-                if (grid[r][c] == '-') return new Point(c, r);
+                if (grid[r][c] == '-') {
+                    sumC += c;
+                    doorR = r;
+                    count++;
+                }
             }
+        }
+        if (count > 0) {
+            return new Point(sumC / count, doorR);
         }
         return null;
     }
@@ -671,27 +1062,63 @@ public final class PacMan extends Application {
         for (Dir d : Dir.values()) {
             if (d == Dir.NONE || d == opposite(gdir[i])) continue;
             int nr = r + drow(d), nc = c + dcol(d);
-            if (!inside(nr, nc)) { opts.add(d); continue; }
+            if (!inside(nr, nc)) {
+                if (isTunnelRow(r) && (d == Dir.LEFT || d == Dir.RIGHT)) opts.add(d);
+                continue;
+            }
             if (isWalk(nr, nc, throughDoor)) opts.add(d);
         }
-        if (opts.isEmpty()) { gdir[i] = opposite(gdir[i]); return; }
+        if (opts.isEmpty()) {
+            Dir opp = opposite(gdir[i]);
+            int nr = r + drow(opp), nc = c + dcol(opp);
+            if (isWalk(nr, nc, throughDoor) || (isTunnelRow(r) && (opp == Dir.LEFT || opp == Dir.RIGHT))) {
+                gdir[i] = opp;
+            } else {
+                for (Dir d : Dir.values()) {
+                    if (d == Dir.NONE) continue;
+                    int dnr = r + drow(d), dnc = c + dcol(d);
+                    if (isWalk(dnr, dnc, throughDoor)) {
+                        gdir[i] = d;
+                        break;
+                    }
+                }
+            }
+            return;
+        }
 
         Dir best;
-        if (ghostMode[i] == 3 || ghostMode[i] == 4) {          // ojos → puerta
-            Point t = findDoor(); if (t == null) t = new Point(c, r);
-            best = bestToward(opts, r, c, t.y, t.x);
-        } else if (ghostMode[i] == 1) {                        // salir de casa
-            Point t = findDoor(); if (t == null) t = new Point(c, r - 1);
-            best = bestToward(opts, r, c, t.y - 1, t.x);
-        } else if (powerActive && ghostMode[i] == 2) {          // huir: alejarse de Pac-Man
-            best = opts.get(new Random().nextInt(opts.size())); // huida caótica
+        if (ghostMode[i] == 3) {
+            // Ojos: van DIRECTOS al centro/punto de respawn siguiendo el camino BFS más corto
+            best = opts.get(0);
+            int minD = Integer.MAX_VALUE;
+            for (Dir d : opts) {
+                int nr = r + drow(d);
+                int nc = c + dcol(d);
+                if (isTunnelRow(r)) {
+                    if (nc < 0) nc = cols - 1;
+                    else if (nc >= cols) nc = 0;
+                }
+                if (inside(nr, nc)) {
+                    int dVal = distToGhostSpawn[nr][nc];
+                    if (dVal < minD) {
+                        minD = dVal;
+                        best = d;
+                    }
+                }
+            }
+            gdir[i] = best;
+            return;
+        } else if (ghostFrightened[i] && !ghostImmuneToPower[i] && ghostMode[i] == 2) {
+            // Huir de Pac-Man (solo si está asustado y no es inmune)
+            best = opts.get(new Random().nextInt(opts.size()));
             double bd = -1;
             for (Dir d : opts) {
                 int nr = r + drow(d), nc = c + dcol(d);
                 double dist = Math.hypot(nc * CELL - pacX, nr * CELL - pacY);
                 if (dist > bd) { bd = dist; best = d; }
             }
-        } else {                                               // scatter / chase
+        } else {
+            // Modo normal scatter / chase
             int[] t = ghostTarget(i);
             best = bestToward(opts, r, c, t[0], t[1]);
         }
@@ -741,7 +1168,14 @@ public final class PacMan extends Application {
                 powerTime = (double) LEVELS[levelIdx][2];
                 ghostsEatenChain = 0;
                 for (int i = 0; i < GHOSTS_PER_LEVEL; i++) {
-                    if (ghostMode[i] == 2) gdir[i] = opposite(gdir[i]);
+                    // Si Pac-Man se toma otra bola de poder, vuelven a ser comestibles
+                    ghostImmuneToPower[i] = false;
+                    if (ghostMode[i] == 2) {
+                        ghostFrightened[i] = true;
+                        gdir[i] = opposite(gdir[i]);
+                    } else if (ghostMode[i] == 0 || ghostMode[i] == 1) {
+                        ghostFrightened[i] = true;
+                    }
                 }
             }
         }
@@ -755,13 +1189,16 @@ public final class PacMan extends Application {
         // Fantasmas
         for (int i = 0; i < GHOSTS_PER_LEVEL; i++) {
             if (ghostMode[i] != 2) continue;
-            if (Math.hypot(px[i] - pacX, py[i] - pacY) < CELL * 0.7) {
-                if (powerActive) {
+            if (Math.hypot(px[i] - pacX, py[i] - pacY) < CELL * 0.72) {
+                if (ghostFrightened[i] && !ghostImmuneToPower[i]) {
+                    // Pac-Man come al fantasma (solo si está asustado y no es inmune)
                     ghostsEatenChain++;
                     int pts = GHOST_SCORE * ghostsEatenChain; // 250, 500, 1000...
                     addScore(pts, (int) (px[i] / CELL), (int) (py[i] / CELL));
-                    ghostMode[i] = 3;
-                } else {
+                    ghostMode[i] = 3;           // Pasa a ser ojos
+                    ghostFrightened[i] = false;  // Ya no es comestible mientras va como ojos
+                } else if (spawnGrace <= 0) {
+                    // Fantasma normal (o que ya revivió en el respawn ignorando el modo poder): mata a Pac-Man
                     pacDie();
                     return;
                 }
@@ -777,16 +1214,30 @@ public final class PacMan extends Application {
 
     private void pacDie() {
         lives--;
-        deathAnimT = 60;
         if (lives <= 0) {
+            deathAnimT = 60;
             state = State.GAME_OVER;
             syncButtons();
         } else {
-            resetPositions();
+            // Solo Pac-Man reaparece en su spawn; los fantasmas NO respawnean y el juego NO se para
+            pacX = pacSpawn.x * CELL + CELL / 2.0;
+            pacY = pacSpawn.y * CELL + CELL / 2.0;
+            pacDir = Dir.NONE;
+            pacQueued = Dir.NONE;
+            pacLastDir = Dir.RIGHT;
+            spawnGrace = 1.5; // Breve protección de spawn para no morir al instante
+            state = State.PLAYING; // El juego sigue corriendo sin detenerse
+            // Los fantasmas se quedan exactamente en su última posición (px, py, gdir, ghostMode intactos)
         }
     }
 
     private void nextLevel() {
+        if (isTestingSingleLevel) {
+            // En modo test de un nivel individual, al completarlo se muestra victoria de esa prueba
+            state = State.WIN;
+            syncButtons();
+            return;
+        }
         if (levelIdx + 1 >= MAZES.length) {
             state = State.WIN;
             syncButtons();
@@ -838,7 +1289,8 @@ public final class PacMan extends Application {
             }
             case WIN -> {
                 drawBoard(false);
-                drawOverlay("¡HAS GANADO!", "Puntuación final: " + score + " · ¡Enhorabuena!");
+                String msg = isTestingSingleLevel ? "¡Nivel superado con éxito!" : "¡Enhorabuena!";
+                drawOverlay("¡HAS GANADO!", "Puntuación final: " + score + " · " + msg);
             }
         }
 
@@ -862,7 +1314,9 @@ public final class PacMan extends Application {
         gc.fillText("PUNTOS: " + score, 16, 20);
 
         gc.setTextAlign(TextAlignment.CENTER);
-        gc.fillText((String) LEVELS[levelIdx][0], w / 2.0, 20);
+        String lvlTitle = (String) LEVELS[levelIdx][0];
+        if (isTestingSingleLevel) lvlTitle += " [TEST]";
+        gc.fillText(lvlTitle, w / 2.0, 20);
 
         // Vidas restantes
         gc.setFill(PAC_YELLOW);
@@ -928,8 +1382,9 @@ public final class PacMan extends Application {
         // Fantasmas
         for (int i = 0; i < GHOSTS_PER_LEVEL; i++) drawGhost(i);
 
-        // Pac-Man
-        if (deathAnimT > 0) drawPacDeath(); else drawPac();
+        // Pac-Man: al respawnear sigue teniendo la animación de comer
+        if (state == State.GAME_OVER && deathAnimT > 0) drawPacDeath();
+        else drawPac();
 
         // Popups de puntos
         for (double[] p : popupFx) {
@@ -943,8 +1398,15 @@ public final class PacMan extends Application {
     }
 
     private void drawPac() {
-        double mouthAngle = Math.abs(Math.sin(mouthT * 0.25)) * 42.0;
-        double base = switch (pacDir) {
+        if (spawnGrace > 0 && ((int) (spawnGrace * 8)) % 2 == 0) {
+            gc.setGlobalAlpha(0.35); // Efecto sutil de invulnerabilidad tras reaparecer
+        } else {
+            gc.setGlobalAlpha(1.0);
+        }
+
+        double mouthAngle = Math.abs(Math.sin(mouthTimer * 12.0)) * 42.0;
+        Dir facing = (pacDir != Dir.NONE) ? pacDir : pacLastDir;
+        double base = switch (facing) {
             case RIGHT -> 0.0;
             case UP    -> 90.0;
             case LEFT  -> 180.0;
@@ -955,6 +1417,7 @@ public final class PacMan extends Application {
         double start = base + mouthAngle;
         double extent = 360.0 - 2 * mouthAngle;
         gc.fillArc(pacX - CELL / 2.0 + 3, pacY - CELL / 2.0 + 3, CELL - 6, CELL - 6, start, extent, ArcType.ROUND);
+        gc.setGlobalAlpha(1.0);
     }
 
     private void drawPacDeath() {
@@ -971,10 +1434,10 @@ public final class PacMan extends Application {
         Color body;
         if (ghostMode[i] == 3) {
             body = null; // solo ojos
-        } else if (powerActive && ghostMode[i] == 2) {
+        } else if (ghostFrightened[i] && !ghostImmuneToPower[i] && ghostMode[i] == 2) {
             body = (powerTime < 2.0 && (((int) (powerTime * 5)) % 2 == 0)) ? FRIGHT_FLASH : FRIGHT_BLUE;
         } else {
-            body = GHOST_COLORS[i];
+            body = GHOST_COLORS[i]; // color normal (incluye fantasmas inmunes que salieron del respawn)
         }
 
         if (body != null) {
@@ -1011,7 +1474,7 @@ public final class PacMan extends Application {
         gc.setTextBaseline(VPos.CENTER);
         gc.fillText("PAC-MAN", w / 2.0, 70);
 
-        gc.setFont(Font.font("Monospaced", FontWeight.NORMAL, 15));
+        gc.setFont(Font.font("Monospaced", FontWeight.NORMAL, 14));
         gc.setFill(Color.WHITE);
         gc.setTextAlign(TextAlignment.LEFT);
         gc.setTextBaseline(VPos.CENTER);
@@ -1024,14 +1487,40 @@ public final class PacMan extends Application {
                 "   Punto normal  +10      Bola de poder  +50",
                 "   Fantasma      +250     Fruta extra    +100",
                 "",
-                "4 niveles · laberintos y velocidades distintas",
+                "VELOCIDAD:",
+                "   Modo normal: fantasmas 1 px/s más rápidos que Pac-Man",
+                "   Modo poder:  fantasmas más lentos que Pac-Man (según nivel)",
                 "",
-                "Pulsa ENTER, ESPACIO o el botón INICIAR"
+                "Pulsa ENTER, ESPACIO o el botón INICIAR para jugar todo"
         };
-        double y = 140;
+        double y = 135;
         for (String s : lines) {
-            gc.fillText(s, w / 2.0 - 230, y);
-            y += 24;
+            gc.fillText(s, w / 2.0 - 245, y);
+            y += 21;
+        }
+
+        // Sección interactiva de Test de Niveles
+        gc.setFill(Color.rgb(120, 200, 255));
+        gc.setFont(Font.font("Monospaced", FontWeight.BOLD, 15));
+        gc.setTextAlign(TextAlignment.CENTER);
+        gc.setTextBaseline(VPos.CENTER);
+        gc.fillText("🧪 TESTEAR NIVEL INDEPENDIENTE (Clic o Teclas 1-4):", w / 2.0, 390);
+
+        for (int lvl = 0; lvl < 4; lvl++) {
+            double bx = w / 2.0 - 245 + lvl * 125;
+            double by = 412;
+            gc.setFill(Color.rgb(24, 24, 52));
+            gc.fillRoundRect(bx, by, 115, 46, 14, 14);
+            gc.setStroke(Color.rgb(80, 140, 255));
+            gc.setLineWidth(1.5);
+            gc.strokeRoundRect(bx, by, 115, 46, 14, 14);
+
+            gc.setFill(PAC_YELLOW);
+            gc.setFont(Font.font("Monospaced", FontWeight.BOLD, 14));
+            gc.fillText("NIVEL " + (lvl + 1), bx + 57, by + 18);
+            gc.setFill(Color.rgb(180, 210, 255));
+            gc.setFont(Font.font("Monospaced", FontWeight.NORMAL, 11));
+            gc.fillText("Tecla [" + (lvl + 1) + "]", bx + 57, by + 34);
         }
 
         // Animación decorativa inferior
