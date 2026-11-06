@@ -17,7 +17,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <javafx.version>21.0.4</javafx.version>
         <javafx.plugin.version>0.0.8</javafx.plugin.version>
-        <main.class>es.sanalberto.daniel.pacman.Main</main.class>
+        <main.class>es.sanalberto.daniel.pacman.PacMan</main.class>
     </properties>
 
     <dependencies>
