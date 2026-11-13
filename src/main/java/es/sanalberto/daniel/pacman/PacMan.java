@@ -11,6 +11,7 @@ import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.Button;
 import javafx.scene.control.ComboBox;
 import javafx.scene.control.ListCell;
+import javafx.scene.image.Image;
 import javafx.scene.input.KeyCode;
 import javafx.scene.layout.BorderPane;
 import javafx.scene.layout.HBox;
@@ -324,6 +325,34 @@ public final class PacMan extends Application {
     private Button btnStart, btnPause, btnMenu, btnTestLevel;
     private ComboBox<String> comboLevelTest;
 
+    // Sprites detallados generados
+    private Image imgPacClosed, imgPacHalf, imgPacOpen;
+    private final Image[] imgGhosts = new Image[4];
+    private Image imgGhostFrightened, imgGhostFrightenedWhite;
+
+    private void loadCustomSprites() {
+        try {
+            imgPacClosed = loadSprite("/sprites/pacman_closed.png");
+            imgPacHalf   = loadSprite("/sprites/pacman_half.png");
+            imgPacOpen   = loadSprite("/sprites/pacman_open.png");
+
+            imgGhosts[0] = loadSprite("/sprites/ghost_blinky.png");
+            imgGhosts[1] = loadSprite("/sprites/ghost_pinky.png");
+            imgGhosts[2] = loadSprite("/sprites/ghost_inky.png");
+            imgGhosts[3] = loadSprite("/sprites/ghost_clyde.png");
+
+            imgGhostFrightened      = loadSprite("/sprites/ghost_frightened.png");
+            imgGhostFrightenedWhite = loadSprite("/sprites/ghost_frightened_white.png");
+        } catch (Exception e) {
+            System.err.println("No se pudieron cargar los sprites personalizados: " + e.getMessage());
+        }
+    }
+
+    private Image loadSprite(String resourcePath) {
+        var is = getClass().getResourceAsStream(resourcePath);
+        return (is != null) ? new Image(is) : null;
+    }
+
     // ============================== ENTRY POINT ============================
     public static void main(String[] args) {
         launch(args);
@@ -331,6 +360,7 @@ public final class PacMan extends Application {
 
     @Override
     public void start(Stage stage) {
+        loadCustomSprites();
         int canvasW = MAZES[0][0].length() * CELL;
         int canvasH = HUD_H + MAZES[0].length * CELL;
 
@@ -1439,9 +1469,13 @@ public final class PacMan extends Application {
         gc.fillText(lvlTitle, w / 2.0, 20);
 
         // Vidas restantes
-        gc.setFill(PAC_YELLOW);
         for (int i = 0; i < lives; i++) {
-            gc.fillArc(w - 36 - i * 26, 10, 20, 20, 30, 300, ArcType.ROUND);
+            if (imgPacClosed != null) {
+                gc.drawImage(imgPacClosed, w - 38 - i * 26, 8, 22, 22);
+            } else {
+                gc.setFill(PAC_YELLOW);
+                gc.fillArc(w - 36 - i * 26, 10, 20, 20, 30, 300, ArcType.ROUND);
+            }
         }
 
         if (powerActive) {
@@ -1519,24 +1553,52 @@ public final class PacMan extends Application {
 
     private void drawPac() {
         if (spawnGrace > 0 && ((int) (spawnGrace * 8)) % 2 == 0) {
-            gc.setGlobalAlpha(0.35); // Efecto sutil de invulnerabilidad tras reaparecer
+            gc.setGlobalAlpha(0.35);
         } else {
             gc.setGlobalAlpha(1.0);
         }
 
         double mouthAngle = Math.abs(Math.sin(mouthTimer * 12.0)) * 42.0;
         Dir facing = (pacDir != Dir.NONE) ? pacDir : pacLastDir;
-        double base = switch (facing) {
-            case RIGHT -> 0.0;
-            case UP    -> 90.0;
-            case LEFT  -> 180.0;
-            case DOWN  -> 270.0;
-            default    -> 0.0;
-        };
-        gc.setFill(PAC_YELLOW);
-        double start = base + mouthAngle;
-        double extent = 360.0 - 2 * mouthAngle;
-        gc.fillArc(pacX - CELL / 2.0 + 3, pacY - CELL / 2.0 + 3, CELL - 6, CELL - 6, start, extent, ArcType.ROUND);
+
+        // Seleccionar frame del sprite según apertura de boca
+        Image pacImg = (mouthAngle < 10) ? imgPacClosed
+                     : (mouthAngle < 28) ? imgPacHalf
+                     : imgPacOpen;
+
+        double size = CELL - 2;
+        double drawX = pacX - size / 2.0;
+        double drawY = pacY - size / 2.0;
+
+        if (pacImg != null) {
+            // Rotar el sprite según la dirección
+            double rotDeg = switch (facing) {
+                case RIGHT -> 0.0;
+                case DOWN  -> 90.0;
+                case LEFT  -> 180.0;
+                case UP    -> 270.0;
+                default    -> 0.0;
+            };
+            gc.save();
+            gc.translate(pacX, pacY);
+            gc.rotate(rotDeg);
+            gc.drawImage(pacImg, -size / 2.0, -size / 2.0, size, size);
+            gc.restore();
+        } else {
+            // Fallback con shapes si no hay imagen
+            double base = switch (facing) {
+                case RIGHT -> 0.0;
+                case UP    -> 90.0;
+                case LEFT  -> 180.0;
+                case DOWN  -> 270.0;
+                default    -> 0.0;
+            };
+            gc.setFill(PAC_YELLOW);
+            double start = base + mouthAngle;
+            double extent = 360.0 - 2 * mouthAngle;
+            gc.fillArc(pacX - CELL / 2.0 + 3, pacY - CELL / 2.0 + 3, CELL - 6, CELL - 6, start, extent, ArcType.ROUND);
+        }
+
         gc.setGlobalAlpha(1.0);
     }
 
@@ -1545,34 +1607,65 @@ public final class PacMan extends Application {
         double openDeg = (1.0 - t) * 180.0;
         double extent = Math.max(0.0, 360.0 - 2 * openDeg);
         double start = 90.0 + openDeg;
-        gc.setFill(PAC_YELLOW);
-        gc.fillArc(pacX - CELL / 2.0 + 3, pacY - CELL / 2.0 + 3, CELL - 6, CELL - 6, start, extent, ArcType.ROUND);
+
+        // Usar sprite de pacman cerrado con alpha progresivo si está disponible
+        if (imgPacClosed != null) {
+            double size = CELL - 2;
+            gc.setGlobalAlpha(t);
+            gc.save();
+            gc.translate(pacX, pacY);
+            gc.rotate(openDeg); // rotar mientras "muere"
+            gc.drawImage(imgPacClosed, -size / 2.0, -size / 2.0, size, size);
+            gc.restore();
+            gc.setGlobalAlpha(1.0);
+        } else {
+            gc.setFill(PAC_YELLOW);
+            gc.fillArc(pacX - CELL / 2.0 + 3, pacY - CELL / 2.0 + 3, CELL - 6, CELL - 6, start, extent, ArcType.ROUND);
+        }
     }
 
     private void drawGhost(int i) {
         double x = px[i], y = py[i];
-        Color body;
+        double size = CELL - 2;
+        double drawX = x - size / 2.0;
+        double drawY = y - size / 2.0;
+
+        // Determinar qué sprite usar
+        Image ghostImg = null;
+        Color fallbackBody = null;
+
         if (ghostMode[i] == 3) {
-            body = null; // solo ojos
+            // Solo ojos (volviendo al respawn): sin sprite de cuerpo, dibujar solo ojos
+            fallbackBody = null;
         } else if (ghostFrightened[i] && !ghostImmuneToPower[i] && ghostMode[i] == 2) {
-            body = (powerTime < 2.0 && (((int) (powerTime * 5)) % 2 == 0)) ? FRIGHT_FLASH : FRIGHT_BLUE;
+            // Modo asustado / parpadeo
+            boolean flash = powerTime < 2.0 && (((int) (powerTime * 5)) % 2 == 0);
+            ghostImg = flash ? imgGhostFrightenedWhite : imgGhostFrightened;
+            if (ghostImg == null) fallbackBody = flash ? FRIGHT_FLASH : FRIGHT_BLUE;
         } else {
-            body = GHOST_COLORS[i]; // color normal (incluye fantasmas inmunes que salieron del respawn)
+            // Color normal por índice
+            if (i < imgGhosts.length) ghostImg = imgGhosts[i];
+            if (ghostImg == null) fallbackBody = GHOST_COLORS[i];
         }
 
-        if (body != null) {
-            gc.setFill(body);
-            gc.fillArc(x - CELL / 2.0 + 3, y - CELL / 2.0 + 3, CELL - 6, CELL - 6, 0, 180, ArcType.ROUND);
-            gc.fillRect(x - CELL / 2.0 + 3, y, CELL - 6, CELL / 2.0 - 3);
-            // ondas inferiores
-            double waveW = (CELL - 6) / 3.0;
-            for (int w = 0; w < 3; w++) {
-                gc.fillArc(x - CELL / 2.0 + 3 + w * waveW, y + CELL / 2.0 - 8, waveW, 8, 180, 180, ArcType.ROUND);
+        if (ghostMode[i] != 3) {
+            if (ghostImg != null) {
+                gc.drawImage(ghostImg, drawX, drawY, size, size);
+            } else if (fallbackBody != null) {
+                // Fallback: dibujar con shapes
+                gc.setFill(fallbackBody);
+                gc.fillArc(x - CELL / 2.0 + 3, y - CELL / 2.0 + 3, CELL - 6, CELL - 6, 0, 180, ArcType.ROUND);
+                gc.fillRect(x - CELL / 2.0 + 3, y, CELL - 6, CELL / 2.0 - 3);
+                double waveW = (CELL - 6) / 3.0;
+                for (int w = 0; w < 3; w++) {
+                    gc.fillArc(x - CELL / 2.0 + 3 + w * waveW, y + CELL / 2.0 - 8, waveW, 8, 180, 180, ArcType.ROUND);
+                }
             }
         }
 
-        // ojos
-        if (ghostMode[i] != 0 || body != null) {
+        // Ojos (siempre visibles excepto en modo asustado que ya los lleva el sprite)
+        boolean showEyes = ghostMode[i] == 3 || (ghostImg == null && ghostMode[i] != 0);
+        if (showEyes) {
             gc.setFill(Color.WHITE);
             gc.fillOval(x - 8, y - 6, 7, 8);
             gc.fillOval(x + 1, y - 6, 7, 8);
@@ -1650,21 +1743,29 @@ public final class PacMan extends Application {
 
         // Animación decorativa inferior
         double tt = System.currentTimeMillis() / 1000.0;
-        gc.setFill(PAC_YELLOW);
         double pacDecorX = (w / 2.0 - 160 + (tt * 50 % 320)) - 12;
-        gc.fillArc(pacDecorX, h - 90, 24, 24, 30, 300, ArcType.ROUND);
+        if (imgPacOpen != null) {
+            gc.drawImage(imgPacOpen, pacDecorX, h - 93, 26, 26);
+        } else {
+            gc.setFill(PAC_YELLOW);
+            gc.fillArc(pacDecorX, h - 90, 24, 24, 30, 300, ArcType.ROUND);
+        }
 
         for (int i = 0; i < 4; i++) {
-            gc.setFill(GHOST_COLORS[i]);
             double gx = w / 2.0 - 180 + i * 60;
-            gc.fillArc(gx, h - 60, 24, 24, 0, 180, ArcType.ROUND);
-            gc.fillRect(gx, h - 48, 24, 12);
-            gc.setFill(Color.WHITE);
-            gc.fillOval(gx + 4, h - 55, 6, 7);
-            gc.fillOval(gx + 14, h - 55, 6, 7);
-            gc.setFill(Color.rgb(30, 40, 160));
-            gc.fillOval(gx + 6, h - 53, 3, 4);
-            gc.fillOval(gx + 16, h - 53, 3, 4);
+            if (imgGhosts[i] != null) {
+                gc.drawImage(imgGhosts[i], gx, h - 63, 26, 26);
+            } else {
+                gc.setFill(GHOST_COLORS[i]);
+                gc.fillArc(gx, h - 60, 24, 24, 0, 180, ArcType.ROUND);
+                gc.fillRect(gx, h - 48, 24, 12);
+                gc.setFill(Color.WHITE);
+                gc.fillOval(gx + 4, h - 55, 6, 7);
+                gc.fillOval(gx + 14, h - 55, 6, 7);
+                gc.setFill(Color.rgb(30, 40, 160));
+                gc.fillOval(gx + 6, h - 53, 3, 4);
+                gc.fillOval(gx + 16, h - 53, 3, 4);
+            }
         }
     }
 
