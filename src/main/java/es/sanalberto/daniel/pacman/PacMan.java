@@ -59,10 +59,12 @@ public final class PacMan extends Application {
             {"NIVEL 2 · Animado",    82.0, 7.0},
             {"NIVEL 3 · Rápido",    102.0, 6.0},
             {"NIVEL 4 · Frenético", 122.0, 5.0},
+            {"NIVEL 5 · Laberinto", 142.0, 4.5},
+            {"NIVEL 6 · Maestro",   162.0, 4.0},
     };
 
     /** Proporción de velocidad del fantasma asustado respecto a Pac-Man por nivel (siempre por debajo de pacman). */
-    private static final double[] FRIGHTENED_RATIOS = {0.76, 0.83, 0.89, 0.94};
+    private static final double[] FRIGHTENED_RATIOS = {0.76, 0.83, 0.89, 0.94, 0.96, 0.98};
 
     /** Modos scatter/chase globales (segundos). El último queda fijo en chase. */
     private static final double[] MODE_SEQ = {7, 20, 7, 20, 5, 20, 5};
@@ -216,7 +218,74 @@ public final class PacMan extends Application {
                     "#.#.###################.#.#",
                     "#.#.....................#.#",
                     "#o..........P...........o.#",
-                    "###########################"}
+                    "###########################"
+            },
+            { // -------- NIVEL 5: laberinto sinuoso y complejo --------
+                    "###########################",
+                    "#o.......................o#",
+                    "#.###.#.###########.#.###.#",
+                    "#.#...#.....#.#.....#...#.#",
+                    "#.#.#####.#.#.#.#.#####.#.#",
+                    "#.#.#...#.#.#.#.#.#...#.#.#",
+                    "#.###.#.#.###.###.#.#.###.#",
+                    "#.....#.#...#.#...#.#.....#",
+                    "#####.#.###.#.#.###.#.#####",
+                    "#.....#...#.....#...#.....#",
+                    "#.###.###.#.###.#.###.###.#",
+                    "#...#.....#     #.....#...#",
+                    "###.#.###.##---##.###.#.###",
+                    "#...#.#...#     #...#.#...#",
+                    "  #.#.#.#.# G G #.#.#.#.#  ",
+                    "###.#.#...#     #...#.#.###",
+                    "#...#.###.#######.###.#...#",
+                    "#.###.....#.....#.....###.#",
+                    "#.....###.#.###.#.###.....#",
+                    "#####...#.#...#.#.#...#####",
+                    "#.....#.#.###.#.#.#.#.....#",
+                    "#.###.#.#...#.#.#.#.#.###.#",
+                    "#.#...#.###.#.#.#.#.#...#.#",
+                    "#.#.###.....#.#.....###.#.#",
+                    "#.#...#.#####.#####.#...#.#",
+                    "#.###.#.............#.###.#",
+                    "#...#.#.###########.#.#...#",
+                    "###.#.#......#......#.#.###",
+                    "#...#.#.####.#.####.#.#...#",
+                    "#o....#......P......#....o#",
+                    "###########################"
+            },
+            { // -------- NIVEL 6: máxima complejidad y cruces tácticos --------
+                    "###########################",
+                    "#o..#.......#.#.......#..o#",
+                    "###.#.#####.#.#.#####.#.###",
+                    "#...#...#...#.#...#...#...#",
+                    "#.#####.#.#.#.#.#.#.#####.#",
+                    "#.#...#.#.#.....#.#.#...#.#",
+                    "#.#.#.#.###.###.###.#.#.#.#",
+                    "#...#.#.....#.#.....#.#...#",
+                    "###.#.#.###.#.#.###.#.#.###",
+                    "#...#...#...#.#...#...#...#",
+                    "#.#####.#.###.###.#.#####.#",
+                    "#.......#         #.......#",
+                    "#######.#.##---##.#.#######",
+                    "#.......#.#     #.#.......#",
+                    "  #####.#.# G G #.#.#####  ",
+                    "#######.#.#     #.#.#######",
+                    "#.......#.#######.#.......#",
+                    "#.#####.#.........#.#####.#",
+                    "#...#...#.#######.#...#...#",
+                    "###.#.#.#....#....#.#.#.###",
+                    "#...#.#.#.##.#.##.#.#.#...#",
+                    "#.###.#.#..#.#.#..#.#.###.#",
+                    "#.#...#.#..#.#.#..#.#...#.#",
+                    "#.#.###.#.##.#.##.#.###.#.#",
+                    "#.#.....#....#....#.....#.#",
+                    "#.#####.###########.#####.#",
+                    "#...#...#....#....#...#...#",
+                    "###.#.#.#.##.#.##.#.#.#.###",
+                    "#...#.#......#......#.#...#",
+                    "#o###.#......P......#.###o#",
+                    "###########################"
+            }
     };
 
     // ============================== ESTADO =================================
@@ -277,7 +346,7 @@ public final class PacMan extends Application {
         }, 90);
 
         comboLevelTest = new ComboBox<>();
-        comboLevelTest.getItems().addAll("Nivel 1", "Nivel 2", "Nivel 3", "Nivel 4");
+        comboLevelTest.getItems().addAll("Nivel 1", "Nivel 2", "Nivel 3", "Nivel 4", "Nivel 5", "Nivel 6");
         comboLevelTest.setValue("Nivel 1");
         comboLevelTest.setFocusTraversable(false);
         comboLevelTest.setPrefSize(105, 34);
@@ -332,9 +401,13 @@ public final class PacMan extends Application {
                 double badgeY = 495;
                 double badgeH = 50;
                 if (y >= badgeY && y <= badgeY + badgeH) {
-                    for (int lvl = 0; lvl < 4; lvl++) {
-                        double bx = w / 2.0 - 245 + lvl * 125;
-                        if (x >= bx && x <= bx + 115) {
+                    double badgeW = 96;
+                    double gap = 12;
+                    double totalW = 6 * badgeW + 5 * gap;
+                    double startX = (w - totalW) / 2.0;
+                    for (int lvl = 0; lvl < 6; lvl++) {
+                        double bx = startX + lvl * (badgeW + gap);
+                        if (x >= bx && x <= bx + badgeW) {
                             startLevelTest(lvl);
                             break;
                         }
@@ -404,6 +477,8 @@ public final class PacMan extends Application {
                 case DIGIT2, NUMPAD2 -> { startLevelTest(1); return; }
                 case DIGIT3, NUMPAD3 -> { startLevelTest(2); return; }
                 case DIGIT4, NUMPAD4 -> { startLevelTest(3); return; }
+                case DIGIT5, NUMPAD5 -> { startLevelTest(4); return; }
+                case DIGIT6, NUMPAD6 -> { startLevelTest(5); return; }
                 default -> {}
             }
         }
@@ -1549,23 +1624,28 @@ public final class PacMan extends Application {
         gc.setFont(Font.font("Monospaced", FontWeight.BOLD, 15));
         gc.setTextAlign(TextAlignment.CENTER);
         gc.setTextBaseline(VPos.CENTER);
-        gc.fillText("🧪 TESTEAR NIVEL INDEPENDIENTE (Clic o Teclas 1-4):", w / 2.0, 465);
+        gc.fillText("🧪 TESTEAR NIVEL INDEPENDIENTE (Clic o Teclas 1-6):", w / 2.0, 465);
 
-        for (int lvl = 0; lvl < 4; lvl++) {
-            double bx = w / 2.0 - 245 + lvl * 125;
-            double by = 495;
+        double badgeW = 96;
+        double gap = 12;
+        double totalW = 6 * badgeW + 5 * gap;
+        double startX = (w - totalW) / 2.0;
+        double by = 495;
+
+        for (int lvl = 0; lvl < 6; lvl++) {
+            double bx = startX + lvl * (badgeW + gap);
             gc.setFill(Color.rgb(24, 24, 52));
-            gc.fillRoundRect(bx, by, 115, 50, 14, 14);
+            gc.fillRoundRect(bx, by, badgeW, 50, 14, 14);
             gc.setStroke(Color.rgb(80, 140, 255));
             gc.setLineWidth(1.5);
-            gc.strokeRoundRect(bx, by, 115, 50, 14, 14);
+            gc.strokeRoundRect(bx, by, badgeW, 50, 14, 14);
 
             gc.setFill(PAC_YELLOW);
-            gc.setFont(Font.font("Monospaced", FontWeight.BOLD, 14));
-            gc.fillText("NIVEL " + (lvl + 1), bx + 57, by + 19);
+            gc.setFont(Font.font("Monospaced", FontWeight.BOLD, 13));
+            gc.fillText("NIVEL " + (lvl + 1), bx + badgeW / 2.0, by + 19);
             gc.setFill(Color.rgb(180, 210, 255));
             gc.setFont(Font.font("Monospaced", FontWeight.NORMAL, 11));
-            gc.fillText("Tecla [" + (lvl + 1) + "]", bx + 57, by + 36);
+            gc.fillText("Tecla [" + (lvl + 1) + "]", bx + badgeW / 2.0, by + 36);
         }
 
         // Animación decorativa inferior
