@@ -93,7 +93,7 @@ public final class PacMan extends Application {
                     "#.####.#####.#.#####.####.#",
                     "#o####.#####.#.#####.####o#",
                     "#.####.#####.#.#####.####.#",
-                    "#..........................#",
+                    "#.........................#",
                     "#.####.#.#######.#.####.###",
                     "#.####.#.#######.#.####.###",
                     "#......#....#....#......  #",
@@ -117,77 +117,79 @@ public final class PacMan extends Application {
                     "#......#....#....#........#",
                     "#.#########.#.#########.###",
                     "#.#########.#.#########.###",
-                    "#..........................#",
+                    "#.........................#",
                     "###########################"},
             { // -------- NIVEL 2: más pasillos y cruces --------
                     "###########################",
-                    "#o...#........#........#..o#",
-                    "#.##.#.######.#.######.#.##",
-                    "#.#..#.#....#.#.#....#.#..#",
-                    "#.#.##.#.##.#.#.#.##.#.##.#",
-                    "#.#....#.#.....#.#....#...#",
-                    "#.####.#.#.#####.#.##.###.#",
-                    "#......#.#...#...##........#",
-                    "######.#####.#.#####.######",
-                    "#....#.....#.#.#.....#....#",
-                    "#.##.#####.#.#.#.#####.##.#",
-                    "#.#......#.#.#.#.#......#.#",
-                    "#.#.####.#.....#.#.####.#.#",
-                    "#.#.#  ###--###  #.#..#.#.#",
-                    "#.#.#  #     #  #.#.#...#.#",
-                    "#.#.#  # G G #  #.#.###.#.#",
-                    "#.#.#  #     #  #.#.#...#.#",
-                    "#.#.#  #######  #.#.#.#.#.#",
-                    "#.#.####.....####.#.#.#.#.#",
-                    "#.#....#.#.#.#....#.#.#.#.#",
-                    "#.####.#.#.#.#.####.#.#.#.#",
-                    "#......#.#.#.#......#.#...#",
-                    "#.######.#.#.######.#.###.#",
-                    "#....#...#.#.#...#...#....#",
-                    "####.#.###.#.#.#.###.#.####",
-                    "#....#.#...#.#.#.#...#....#",
-                    "#.####.#.###.#.#.#.####.#.#",
-                    "#.#....#.....#.....#....#.#",
-                    "#.#.####################.#.#",
-                    "#o..........P............o#",
-                    "###########################"},
+                    "#o....#.............#....o#",
+                    "#.###.#.###########.#.###.#",
+                    "#.#...#.............#...#.#",
+                    "#.#.###.###########.###.#.#",
+                    "#.#.....................#.#",
+                    "#.###.#.###########.#.###.#",
+                    "#.....#.............#.....#",
+                    "#####.#.###########.#.#####",
+                    "#.....#.............#.....#",
+                    "#.###.#.###########.#.###.#",
+                    "#...#.#.............#.#...#",
+                    "###.#.#.##-------##.#.#.###",
+                    "#...#.#.#         #.#.#...#",
+                    "#.###.#.# G     G #.#.###.#",
+                    "#...#.#.#         #.#.#...#",
+                    "###.#.#.###########.#.#.###",
+                    "#...#.#.............#.#...#",
+                    "#.###.#.###########.#.###.#",
+                    "#.....#.............#.....#",
+                    "#####.#.###########.#.#####",
+                    "#.....#.............#.....#",
+                    "#.###.#.###########.#.###.#",
+                    "#.#...#.............#...#.#",
+                    "#.#.###.###########.###.#.#",
+                    "#.#.....................#.#",
+                    "#.###.#.###########.#.###.#",
+                    "#...#.#.............#.#...#",
+                    "###.#.#.###########.#.#.###",
+                    "#o....#......P......#....o#",
+                    "###########################"
+            },
             { // -------- NIVEL 3: denso, muchos giros --------
                     "###########################",
-                    "#.........#...#...........#",
-                    "#.#######.#.#.#.#########.#",
-                    "#.#.....#.#.#.#.....#...#.#",
-                    "#.#.###.#.#.#.#####.#.#.#.#",
-                    "#.#.#...#.#.#.....#.#.#.#.#",
-                    "#.#.#.###.#.#####.#.#.#.#.#",
-                    "#.#.#.#...#.....#.#.#.#.#.#",
-                    "#.#.#.#.#######.#.#.#.#.#.#",
-                    "#.#.#.#.#.....#.#.#.#.#.#.#",
-                    "#.#.#.#.#.###.#.#.#.#.#.#.#",
-                    "#.#.#.#.#.#o..#.#.#.#.#.#.#",
+                    "#o....#.............#....o#",
+                    "#.###.#.###.###.###.#.###.#",
+                    "#.#...#...#.###.#...#...#.#",
+                    "#.#.#####.#.###.#.#####.#.#",
+                    "#.#.#...#.#.###.#.#...#.#.#",
                     "#.#.#.#.#.#.###.#.#.#.#.#.#",
-                    "#.#.#.#.#.#.#...#.#.#.#.#.#",
-                    "#.#.#.#.#.#.#.#---#.#.#.#.#",
-                    "#.#.#.#.#.#.#.# GG#.#.#.#.#",
-                    "#.#.#.#.#.#.#.#   #.#.#.#.#",
-                    "#.#.#.#.#.#.#.#####.#.#.#.#",
-                    "#.#.#.#.#.#.#.......#.#.#.#",
-                    "#.#.#.#.#.#.#########.#.#.#",
-                    "#.#.#.#.#.#...........#.#.#",
-                    "#.#.#.#.#.#############.#.#",
-                    "#.#.#.#.#...............#.#",
-                    "#.#.#.#.#################.#",
-                    "#.#.#.#...................#",
-                    "#.#.#.#####################",
-                    "#.#.#.....................#",
-                    "#.#.#####################.#",
-                    "#.#.......................#",
-                    "#o#####.#######.#########o#",
-                    "#############P#############"},
+                    "#...#.#...#.....#...#.#...#",
+                    "###.#.###.#######.###.#.###",
+                    "#...#.#.............#.#...#",
+                    "#.###.#.###########.#.###.#",
+                    "#.....#.............#.....#",
+                    "#####.#.##-------##.#.#####",
+                    "#.....#.#         #.#.....#",
+                    "#.###.#.# G     G #.#.###.#",
+                    "#...#.#.#         #.#.#...#",
+                    "###.#.#.###########.#.#.###",
+                    "#...#.#.............#.#...#",
+                    "#.###.#.###########.#.###.#",
+                    "#...#.#.............#.#...#",
+                    "###.#.###.#######.###.#.###",
+                    "#...#.#...#.....#...#.#...#",
+                    "#.#.#.#.#.#.###.#.#.#.#.#.#",
+                    "#.#.#...#.#.###.#.#...#.#.#",
+                    "#.#.#####.#.###.#.#####.#.#",
+                    "#.#...#...#.###.#...#...#.#",
+                    "#.###.#.###.###.###.#.###.#",
+                    "#.....#.............#.....#",
+                    "#####.#.###########.#.#####",
+                    "#o....#......P......#....o#",
+                    "###########################"
+            },
             { // -------- NIVEL 4: abierto y traicionero --------
                     "###########################",
                     "#......#.....#.....#......#",
                     "#.####.#.###.#.###.#.####.#",
-                    "#.#........................#",
+                    "#.#.......................#",
                     "#.#.####.#####.#####.####.#",
                     "#.#....#.#...#.#...#.#....#",
                     "#.####.#.#.#.#.#.#.#.#.####",
@@ -327,8 +329,8 @@ public final class PacMan extends Application {
                 double x = e.getX();
                 double y = e.getY() - HUD_H;
                 double w = canvas.getWidth();
-                double badgeY = 410;
-                double badgeH = 46;
+                double badgeY = 495;
+                double badgeH = 50;
                 if (y >= badgeY && y <= badgeY + badgeH) {
                     for (int lvl = 0; lvl < 4; lvl++) {
                         double bx = w / 2.0 - 245 + lvl * 125;
@@ -563,11 +565,38 @@ public final class PacMan extends Application {
         // Precalcular distancias BFS para que los ojos vuelvan DIRECTOS al spawn
         computeGhostSpawnBFS();
 
-        if (fruitCell == null && maxGR >= 0) { // respaldo: buscar hueco bajo la casa
+        // Fruta extra (+100): colocarla cerca de la casa de los fantasmas (debajo de la misma),
+        // pero SIEMPRE FUERA del spawn y en una casilla accesible para el jugador (visited[r][c] == true).
+        if (fruitCell == null) {
+            Point doorPoint = (door != null) ? door : ghostSpawnPoint;
+            int startR = doorPoint.y + 4; // Asegura estar fuera y por debajo de la casa de los fantasmas
             outer:
-            for (int r = maxGR + 1; r < rows; r++) {
-                for (int c = minGC; c <= maxGC; c++) {
-                    if (isWalk(r, c, false)) { fruitCell = new Point(c, r); break outer; }
+            for (int r = startR; r < rows; r++) {
+                for (int d = 0; d < cols; d++) {
+                    int c1 = doorPoint.x + d;
+                    int c2 = doorPoint.x - d;
+                    if (inside(r, c1) && visited[r][c1]) {
+                        fruitCell = new Point(c1, r);
+                        break outer;
+                    }
+                    if (inside(r, c2) && visited[r][c2]) {
+                        fruitCell = new Point(c2, r);
+                        break outer;
+                    }
+                }
+            }
+            if (fruitCell == null) {
+                double minD = Double.MAX_VALUE;
+                for (int r = 0; r < rows; r++) {
+                    for (int c = 0; c < cols; c++) {
+                        if (visited[r][c]) {
+                            double dist = Math.hypot(c - doorPoint.x, r - doorPoint.y);
+                            if (dist < minD) {
+                                minD = dist;
+                                fruitCell = new Point(c, r);
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -930,34 +959,54 @@ public final class PacMan extends Application {
                 curR = Math.max(0, Math.min(rows - 1, curR));
             }
 
-            double targetX = curC * CELL + CELL / 2.0;
-            double targetY = curR * CELL + CELL / 2.0;
+            double centerX = curC * CELL + CELL / 2.0;
+            double centerY = curR * CELL + CELL / 2.0;
 
-            // Centrado perpendicular estricto en el pasillo: nunca roza ni entra en paredes laterales
+            // Centrado perpendicular estricto en el pasillo
             if (dcol(gdir[i]) != 0) {
-                py[i] = targetY;
+                py[i] = centerY;
             } else if (drow(gdir[i]) != 0) {
-                px[i] = targetX;
+                px[i] = centerX;
             }
 
-            int nextR = curR + drow(gdir[i]);
-            int nextC = curC + dcol(gdir[i]);
-            if (isTunnelRow(curR)) {
-                if (nextC < 0) nextC = cols - 1;
-                else if (nextC >= cols) nextC = 0;
-            }
+            // Distancia restante para llegar al centro de la celda actual
+            double toCenter = (centerX - px[i]) * dcol(gdir[i]) + (centerY - py[i]) * drow(gdir[i]);
+            if (toCenter > 0.001) {
+                double step = Math.min(remaining, toCenter);
+                px[i] += dcol(gdir[i]) * step;
+                py[i] += drow(gdir[i]) * step;
+                remaining -= step;
+                if (step >= toCenter) {
+                    px[i] = centerX;
+                    py[i] = centerY;
+                    if (ghostMode[i] == 3) {
+                        double dRespawn = Math.hypot(px[i] - (ghostSpawnPoint.x * CELL + CELL / 2.0),
+                                py[i] - (ghostSpawnPoint.y * CELL + CELL / 2.0));
+                        if (dRespawn < CELL * 0.75) {
+                            px[i] = ghostSpawnPoint.x * CELL + CELL / 2.0;
+                            py[i] = ghostSpawnPoint.y * CELL + CELL / 2.0;
+                            ghostMode[i] = 1;
+                            ghostFrightened[i] = false;
+                            gdir[i] = Dir.UP;
+                            if (powerActive) ghostImmuneToPower[i] = true;
+                            return;
+                        }
+                    }
+                    chooseGhostDir(i, curR, curC, throughDoor);
+                }
+            } else {
+                // Ya en el centro exacto de la celda actual, intentamos avanzar hacia la siguiente
+                int nextR = curR + drow(gdir[i]);
+                int nextC = curC + dcol(gdir[i]);
+                if (isTunnelRow(curR)) {
+                    if (nextC < 0) nextC = cols - 1;
+                    else if (nextC >= cols) nextC = 0;
+                }
 
-            boolean wallAhead = !isWalk(nextR, nextC, throughDoor);
-
-            if (wallAhead) {
-                // Hay muro adelante: el fantasma no puede pasar del centro de la celda actual (hitbox estricto)
-                double distToStop = (dcol(gdir[i]) != 0)
-                        ? (targetX - px[i]) * dcol(gdir[i])
-                        : (targetY - py[i]) * drow(gdir[i]);
-
-                if (distToStop <= 0.001) {
-                    px[i] = targetX;
-                    py[i] = targetY;
+                boolean wallAhead = !isWalk(nextR, nextC, throughDoor);
+                if (wallAhead) {
+                    px[i] = centerX;
+                    py[i] = centerY;
                     chooseGhostDir(i, curR, curC, throughDoor);
                     int testR = curR + drow(gdir[i]);
                     int testC = curC + dcol(gdir[i]);
@@ -966,58 +1015,35 @@ public final class PacMan extends Application {
                         else if (testC >= cols) testC = 0;
                     }
                     if (!isWalk(testR, testC, throughDoor)) {
-                        break; // Bloqueado, esperar en el centro exacto sin atravesar la pared
+                        break;
                     }
                     continue;
-                }
-
-                double step = Math.min(remaining, distToStop);
-                px[i] += dcol(gdir[i]) * step;
-                py[i] += drow(gdir[i]) * step;
-                remaining -= step;
-
-                if (step >= distToStop) {
-                    px[i] = targetX;
-                    py[i] = targetY;
-                    chooseGhostDir(i, curR, curC, throughDoor);
-                }
-            } else {
-                // Camino libre hacia el centro de la siguiente celda
-                double nextCenterX = targetX + dcol(gdir[i]) * CELL;
-                double nextCenterY = targetY + drow(gdir[i]) * CELL;
-
-                double distToNext = (dcol(gdir[i]) != 0)
-                        ? (nextCenterX - px[i]) * dcol(gdir[i])
-                        : (nextCenterY - py[i]) * drow(gdir[i]);
-
-                if (distToNext <= 0.001) {
-                    int reachedC = curC + dcol(gdir[i]);
-                    int reachedR = curR + drow(gdir[i]);
-                    if (isTunnelRow(reachedR)) {
-                        if (reachedC < 0) reachedC = cols - 1;
-                        else if (reachedC >= cols) reachedC = 0;
+                } else {
+                    double nextCenterX = nextC * CELL + CELL / 2.0;
+                    double nextCenterY = nextR * CELL + CELL / 2.0;
+                    double distToNext = (nextCenterX - px[i]) * dcol(gdir[i]) + (nextCenterY - py[i]) * drow(gdir[i]);
+                    double step = Math.min(remaining, distToNext);
+                    px[i] += dcol(gdir[i]) * step;
+                    py[i] += drow(gdir[i]) * step;
+                    remaining -= step;
+                    if (step >= distToNext) {
+                        px[i] = nextCenterX;
+                        py[i] = nextCenterY;
+                        if (ghostMode[i] == 3) {
+                            double dRespawn = Math.hypot(px[i] - (ghostSpawnPoint.x * CELL + CELL / 2.0),
+                                    py[i] - (ghostSpawnPoint.y * CELL + CELL / 2.0));
+                            if (dRespawn < CELL * 0.75) {
+                                px[i] = ghostSpawnPoint.x * CELL + CELL / 2.0;
+                                py[i] = ghostSpawnPoint.y * CELL + CELL / 2.0;
+                                ghostMode[i] = 1;
+                                ghostFrightened[i] = false;
+                                gdir[i] = Dir.UP;
+                                if (powerActive) ghostImmuneToPower[i] = true;
+                                return;
+                            }
+                        }
+                        chooseGhostDir(i, nextR, nextC, throughDoor);
                     }
-                    px[i] = reachedC * CELL + CELL / 2.0;
-                    py[i] = reachedR * CELL + CELL / 2.0;
-                    chooseGhostDir(i, reachedR, reachedC, throughDoor);
-                    continue;
-                }
-
-                double step = Math.min(remaining, distToNext);
-                px[i] += dcol(gdir[i]) * step;
-                py[i] += drow(gdir[i]) * step;
-                remaining -= step;
-
-                if (step >= distToNext) {
-                    int reachedC = curC + dcol(gdir[i]);
-                    int reachedR = curR + drow(gdir[i]);
-                    if (isTunnelRow(reachedR)) {
-                        if (reachedC < 0) reachedC = cols - 1;
-                        else if (reachedC >= cols) reachedC = 0;
-                    }
-                    px[i] = reachedC * CELL + CELL / 2.0;
-                    py[i] = reachedR * CELL + CELL / 2.0;
-                    chooseGhostDir(i, reachedR, reachedC, throughDoor);
                 }
             }
 
@@ -1059,8 +1085,11 @@ public final class PacMan extends Application {
 
     private void chooseGhostDir(int i, int r, int c, boolean throughDoor) {
         List<Dir> opts = new ArrayList<>();
+        boolean isEyes = (ghostMode[i] == 3);
         for (Dir d : Dir.values()) {
-            if (d == Dir.NONE || d == opposite(gdir[i])) continue;
+            if (d == Dir.NONE) continue;
+            // Los ojos volviendo al punto de respawn pueden girar 180° si es el camino más corto
+            if (!isEyes && d == opposite(gdir[i])) continue;
             int nr = r + drow(d), nc = c + dcol(d);
             if (!inside(nr, nc)) {
                 if (isTunnelRow(r) && (d == Dir.LEFT || d == Dir.RIGHT)) opts.add(d);
@@ -1087,7 +1116,7 @@ public final class PacMan extends Application {
         }
 
         Dir best;
-        if (ghostMode[i] == 3) {
+        if (isEyes) {
             // Ojos: van DIRECTOS al centro/punto de respawn siguiendo el camino BFS más corto
             best = opts.get(0);
             int minD = Integer.MAX_VALUE;
@@ -1102,6 +1131,17 @@ public final class PacMan extends Application {
                     int dVal = distToGhostSpawn[nr][nc];
                     if (dVal < minD) {
                         minD = dVal;
+                        best = d;
+                    }
+                }
+            }
+            if (minD == Integer.MAX_VALUE) {
+                double minEuc = Double.MAX_VALUE;
+                for (Dir d : opts) {
+                    int nr = r + drow(d), nc = c + dcol(d);
+                    double euc = Math.hypot(nc - ghostSpawnPoint.x, nr - ghostSpawnPoint.y);
+                    if (euc < minEuc) {
+                        minEuc = euc;
                         best = d;
                     }
                 }
@@ -1197,6 +1237,11 @@ public final class PacMan extends Application {
                     addScore(pts, (int) (px[i] / CELL), (int) (py[i] / CELL));
                     ghostMode[i] = 3;           // Pasa a ser ojos
                     ghostFrightened[i] = false;  // Ya no es comestible mientras va como ojos
+                    int curC = (int) Math.round((px[i] - CELL / 2.0) / CELL);
+                    int curR = (int) Math.round((py[i] - CELL / 2.0) / CELL);
+                    px[i] = curC * CELL + CELL / 2.0;
+                    py[i] = curR * CELL + CELL / 2.0;
+                    chooseGhostDir(i, curR, curC, true);
                 } else if (spawnGrace <= 0) {
                     // Fantasma normal (o que ya revivió en el respawn ignorando el modo poder): mata a Pac-Man
                     pacDie();
@@ -1493,34 +1538,34 @@ public final class PacMan extends Application {
                 "",
                 "Pulsa ENTER, ESPACIO o el botón INICIAR para jugar todo"
         };
-        double y = 135;
+        double y = 130;
         for (String s : lines) {
             gc.fillText(s, w / 2.0 - 245, y);
-            y += 21;
+            y += 22;
         }
 
-        // Sección interactiva de Test de Niveles
+        // Sección interactiva de Test de Niveles (separada limpiamente para evitar superposiciones)
         gc.setFill(Color.rgb(120, 200, 255));
         gc.setFont(Font.font("Monospaced", FontWeight.BOLD, 15));
         gc.setTextAlign(TextAlignment.CENTER);
         gc.setTextBaseline(VPos.CENTER);
-        gc.fillText("🧪 TESTEAR NIVEL INDEPENDIENTE (Clic o Teclas 1-4):", w / 2.0, 390);
+        gc.fillText("🧪 TESTEAR NIVEL INDEPENDIENTE (Clic o Teclas 1-4):", w / 2.0, 465);
 
         for (int lvl = 0; lvl < 4; lvl++) {
             double bx = w / 2.0 - 245 + lvl * 125;
-            double by = 412;
+            double by = 495;
             gc.setFill(Color.rgb(24, 24, 52));
-            gc.fillRoundRect(bx, by, 115, 46, 14, 14);
+            gc.fillRoundRect(bx, by, 115, 50, 14, 14);
             gc.setStroke(Color.rgb(80, 140, 255));
             gc.setLineWidth(1.5);
-            gc.strokeRoundRect(bx, by, 115, 46, 14, 14);
+            gc.strokeRoundRect(bx, by, 115, 50, 14, 14);
 
             gc.setFill(PAC_YELLOW);
             gc.setFont(Font.font("Monospaced", FontWeight.BOLD, 14));
-            gc.fillText("NIVEL " + (lvl + 1), bx + 57, by + 18);
+            gc.fillText("NIVEL " + (lvl + 1), bx + 57, by + 19);
             gc.setFill(Color.rgb(180, 210, 255));
             gc.setFont(Font.font("Monospaced", FontWeight.NORMAL, 11));
-            gc.fillText("Tecla [" + (lvl + 1) + "]", bx + 57, by + 34);
+            gc.fillText("Tecla [" + (lvl + 1) + "]", bx + 57, by + 36);
         }
 
         // Animación decorativa inferior
